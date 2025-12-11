@@ -42,3 +42,13 @@ tools/afcclient
 cython/.libs/*
 cython/*.c
 doxygen.cfg
+
+# Windows build artifacts
+build-output/
+deps-build/
+
+# ================================
+# AI Dev Tools 自动生成文件
+# ================================
+ai-dev-reports/
+.ai-dev-cache/
