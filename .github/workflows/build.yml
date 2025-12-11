@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
+    branches: [ release-1.4.0 ]
   pull_request:
-  schedule:
-    - cron: '0 0 1 * *'
+    branches: [ release-1.4.0 ]
 
 jobs:
   build-linux-ubuntu:
