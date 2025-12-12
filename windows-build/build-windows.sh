@@ -193,21 +193,21 @@ backup_build_artifacts() {
     local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local BUILD_BACKUP="$BACKUP_DIR/$TIMESTAMP"
     
-    mkdir -p "$BUILD_BACKUP"/{bin,lib,include,pkgconfig,docs}
+    mkdir -p "$BUILD_BACKUP"/{lib,include,pkgconfig,docs}
     
-    # 备份可执行文件
+    # 备份可执行文件到根目录
     print_info "备份可执行文件..."
     if [ -d "/mingw64/bin" ]; then
-        cp -v /mingw64/bin/idevice*.exe "$BUILD_BACKUP/bin/" 2>/dev/null || true
-        cp -v /mingw64/bin/afcclient.exe "$BUILD_BACKUP/bin/" 2>/dev/null || true
+        cp -v /mingw64/bin/idevice*.exe "$BUILD_BACKUP/" 2>/dev/null || true
+        cp -v /mingw64/bin/afcclient.exe "$BUILD_BACKUP/" 2>/dev/null || true
     fi
     
-    # 备份库文件
+    # 备份库文件（静态库和导入库）
     print_info "备份库文件..."
     if [ -d "/mingw64/lib" ]; then
-        cp -v /mingw64/lib/libimobiledevice*.dll "$BUILD_BACKUP/lib/" 2>/dev/null || true
         cp -v /mingw64/lib/libimobiledevice*.a "$BUILD_BACKUP/lib/" 2>/dev/null || true
         cp -v /mingw64/lib/libimobiledevice*.la "$BUILD_BACKUP/lib/" 2>/dev/null || true
+        cp -v /mingw64/lib/libimobiledevice*.dll.a "$BUILD_BACKUP/lib/" 2>/dev/null || true
     fi
     
     # 备份头文件
@@ -222,9 +222,10 @@ backup_build_artifacts() {
         cp -v /mingw64/lib/pkgconfig/libimobiledevice*.pc "$BUILD_BACKUP/pkgconfig/" 2>/dev/null || true
     fi
     
-    # 复制依赖的 DLL 文件
-    print_info "收集依赖的 DLL 文件..."
+    # 复制所有必需的 DLL 文件（包括 libimobiledevice 和依赖库）到根目录
+    print_info "收集所有 DLL 文件..."
     local REQUIRED_DLLS=(
+        "libimobiledevice*.dll"
         "libplist*.dll"
         "libusbmuxd*.dll"
         "libimobiledevice-glue*.dll"
@@ -237,10 +238,18 @@ backup_build_artifacts() {
         "libwinpthread*.dll"
         "libgcc_s*.dll"
         "libstdc++*.dll"
+        "libbrotli*.dll"
+        "libnghttp2*.dll"
+        "libidn2*.dll"
+        "libpsl*.dll"
+        "libssh2*.dll"
+        "libunistring*.dll"
+        "libintl*.dll"
     )
     
+    print_info "复制 DLL 文件到根目录..."
     for dll_pattern in "${REQUIRED_DLLS[@]}"; do
-        cp -v /mingw64/bin/$dll_pattern "$BUILD_BACKUP/bin/" 2>/dev/null || true
+        cp -v /mingw64/bin/$dll_pattern "$BUILD_BACKUP/" 2>/dev/null || true
     done
     
     # 创建 README 文件
@@ -254,23 +263,23 @@ libimobiledevice Windows 编译产物
 
 目录结构:
 ---------
-bin/         - 可执行文件和 DLL 文件
+./           - 可执行文件和 DLL 文件（根目录）
 lib/         - 静态库和导入库
 include/     - 头文件
 pkgconfig/   - pkg-config 文件
 
 使用说明:
 ---------
-1. 将 bin/ 目录添加到系统 PATH 环境变量
-2. 或者直接从 bin/ 目录运行工具
+1. 将此目录添加到系统 PATH 环境变量
+2. 或者直接从此目录运行工具
 
 可用工具:
 ---------
-$(ls -1 "$BUILD_BACKUP/bin"/*.exe 2>/dev/null | xargs -n1 basename)
+$(ls -1 "$BUILD_BACKUP"/*.exe 2>/dev/null | xargs -n1 basename)
 
 依赖的 DLL:
 -----------
-$(ls -1 "$BUILD_BACKUP/bin"/*.dll 2>/dev/null | xargs -n1 basename)
+$(ls -1 "$BUILD_BACKUP"/*.dll 2>/dev/null | xargs -n1 basename)
 
 EOF
     
@@ -282,8 +291,8 @@ EOF
     print_info "最新备份链接: $BACKUP_DIR/latest"
     
     # 显示备份统计
-    local exe_count=$(ls -1 "$BUILD_BACKUP/bin"/*.exe 2>/dev/null | wc -l)
-    local dll_count=$(ls -1 "$BUILD_BACKUP/bin"/*.dll 2>/dev/null | wc -l)
+    local exe_count=$(ls -1 "$BUILD_BACKUP"/*.exe 2>/dev/null | wc -l)
+    local dll_count=$(ls -1 "$BUILD_BACKUP"/*.dll 2>/dev/null | wc -l)
     local lib_count=$(ls -1 "$BUILD_BACKUP/lib"/* 2>/dev/null | wc -l)
     
     echo ""
@@ -366,18 +375,11 @@ main() {
         backup_build_artifacts
         show_info
     else
-        print_info "跳过安装步骤"
-        print_info "编译的文件位于项目目录"
-        
-        # 即使不安装也备份编译产物
-        read -p "是否备份编译产物到项目目录? (y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # 临时安装以便备份
-            make install
-            backup_build_artifacts
-            print_warning "已备份编译产物，但未永久安装到系统"
-        fi
+        print_info "跳过安装步骤，但会备份编译产物..."
+        # 临时安装以便备份
+        make install
+        backup_build_artifacts
+        print_warning "已备份编译产物到项目目录，但未永久安装到系统"
     fi
     
     print_success "所有步骤完成！"
